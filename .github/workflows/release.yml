@@ -26,7 +26,7 @@ jobs:
             GRADLEW=$(find . -maxdepth 6 -type f -name gradlew | sed 's|^\./||' | head -n1 || true)
           fi
           if [ -z "$GRADLEW" ]; then
-            echo "::error ::gradlew not found in repository. Please add the Gradle Wrapper (gradlew, gradlew.bat, gradle/wrapper/*) or set workflow to run in the correct subdirectory."
+            echo "::error::gradlew not found in repository. Please add the Gradle Wrapper (gradlew, gradlew.bat, gradle/wrapper/*) or set workflow to run in the correct subdirectory."
             exit 1
           fi
           echo "Found gradlew at: $GRADLEW"
@@ -43,7 +43,7 @@ jobs:
           java-version: '17'
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -53,13 +53,13 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build plugin (buildPlugin)
-        run: "${{ steps.find-gradlew.outputs.path }}" clean buildPlugin --no-daemon --warning-mode=all
+        run: "${{ steps.find-gradlew.outputs.path }}" -p feignx clean buildPlugin --no-daemon --warning-mode=all
 
       - name: List distributions
-        run: ls -la build/distributions || true
+        run: ls -la feignx/build/distributions || true
 
       - name: Create GitHub Release and upload plugin artifact
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.ref_name }}
-          files: build/distributions/*.zip
+          files: feignx/build/distributions/*.zip
