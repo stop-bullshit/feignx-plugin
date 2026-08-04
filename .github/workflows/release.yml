@@ -3,13 +3,17 @@ name: Build and release IntelliJ plugin
 on:
   push:
     tags:
-      - 'v*'          # push 以 v 开头的 tag 会触发构建，例如 v1.0.0
+      - 'v*' # push 以 v 开头的 tag 会触发构建，例如 v1.0.0
+
+permissions:
+  contents: write
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    concurrency:
+      group: release-${{ github.ref_name }}
+      cancel-in-progress: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,17 +52,32 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*','**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
       - name: Build plugin (buildPlugin)
-        run: "${{ steps.find-gradlew.outputs.path }} -p feignx clean buildPlugin --no-daemon --warning-mode=all"
+        run: |
+          set -euo pipefail
+          # -p feignx 假定项目在 feignx 子目录；若不是请移除 -p 或调整子目录
+          "${{ steps.find-gradlew.outputs.path }}" -p feignx clean buildPlugin --no-daemon --warning-mode=all
 
       - name: List distributions
         run: ls -la feignx/build/distributions || true
 
+      - name: Ensure artifact exists
+        id: check-artifact
+        run: |
+          set -e
+          FILES=(feignx/build/distributions/*.zip)
+          if [ ! -e "${FILES[0]}" ]; then
+            echo "::error::No distribution ZIP found under feignx/build/distributions. Build may have failed or output path is different."
+            exit 1
+          fi
+          echo "found=1" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release and upload plugin artifact
+        if: steps.check-artifact.outputs.found == '1'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.ref_name }}
