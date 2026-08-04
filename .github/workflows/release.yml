@@ -13,9 +13,28 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Ensure gradlew is executable
-        run: chmod +x ./gradlew
+      - name: Locate gradlew
+        id: find-gradlew
+        run: |
+          # 优先用 git ls-files 查找已提交的 gradlew（避免未跟踪文件干扰）
+          GRADLEW=$(git ls-files | grep -E '(^|/)(gradlew)$' | head -n1 || true)
+          if [ -z "$GRADLEW" ]; then
+            echo "::warning::gradlew not found in tracked files; searching filesystem up to depth 6"
+            GRADLEW=$(find . -maxdepth 6 -type f -name gradlew | sed 's|^\./||' | head -n1 || true)
+          fi
+          if [ -z "$GRADLEW" ]; then
+            echo "::error ::gradlew not found in repository. Please add the Gradle Wrapper (gradlew, gradlew.bat, gradle/wrapper/*) or set workflow to run in the correct subdirectory."
+            exit 1
+          fi
+          echo "Found gradlew at: $GRADLEW"
+          # 将路径写入输出供后续步骤使用
+          echo "path=$GRADLEW" >> $GITHUB_OUTPUT
+
+      - name: Make gradlew executable
+        run: chmod +x "${{ steps.find-gradlew.outputs.path }}"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -34,7 +53,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build plugin (buildPlugin)
-        run: ./gradlew clean buildPlugin --no-daemon --warning-mode=all
+        run: "${{ steps.find-gradlew.outputs.path }}" clean buildPlugin --no-daemon --warning-mode=all
 
       - name: List distributions
         run: ls -la build/distributions || true
