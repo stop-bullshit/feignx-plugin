@@ -53,7 +53,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build plugin (buildPlugin)
-        run: "${{ steps.find-gradlew.outputs.path }}" -p feignx clean buildPlugin --no-daemon --warning-mode=all
+        run: "${{ steps.find-gradlew.outputs.path }} -p feignx clean buildPlugin --no-daemon --warning-mode=all"
 
       - name: List distributions
         run: ls -la feignx/build/distributions || true
